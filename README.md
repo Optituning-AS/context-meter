@@ -28,6 +28,23 @@ claude plugin install context-meter --marketplace Optituning-AS/context-meter
 
 In the desktop app, where `/plugin` does not run: click + next to the prompt box, then Plugins, Add marketplace with `Optituning-AS/context-meter`, then Add plugin.
 
+## Hiding the band
+
+Click the `×` at the right end of the band to hide it. This hides it in that session only. Other sessions keep theirs, and new sessions start with it showing.
+
+To bring it back, run `/context-meter` in that session. The same command also hides it.
+
+## Updating
+
+From a shell:
+
+```
+claude plugin marketplace update context-meter
+claude plugin update context-meter@context-meter
+```
+
+Then restart Claude Code, or run `/reload-plugins` in an open session.
+
 ## Notes
 
 - The desktop app draws the bar as rounded pills. The terminal draws it as a coloured line.

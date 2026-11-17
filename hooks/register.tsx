@@ -6,6 +6,8 @@ import type { Reading, Segment } from '../types'
 const reading = atom({ plugin: 'context-meter', key: 'reading' } as const, null, {
   shape: 'reading-3',
 })
+// True once the person closed the band in this session.
+const isHidden = atom({ plugin: 'context-meter', key: 'isHidden' } as const, false)
 
 // The Context panel's four coloured rows keep their colours; the rest are grey.
 // Greys are translucent so they read on a light or a dark theme.
@@ -93,6 +95,7 @@ const svgBar = (bars: Bar[]): string => {
 // (room for every category to get one).
 const TEXT_BAR_GLYPH = '\u2501'
 const TEXT_BAR_MIN = 20
+const CLOSE_GLYPH = '\u00d7'
 
 // A terminal has no see-through colours, so the greys are solid there.
 const TEXT_COLORS: Record<string, string> = {
@@ -187,13 +190,49 @@ const refresh = async ($: EngineInterface): Promise<void> => {
   }
 }
 
+const COMMAND = 'context-meter'
+const CLOSE_KEY = 'close:'
+
+// The Button needs a closure; the work is done by the `ui.press` hook.
+const noop = (): void => {}
+
 export const register: Register = on => {
+  // The close button's key names the session it was drawn for, so a press
+  // can only ever hide the band of that session.
+  on('ui.press', async ($, e, next) => {
+    const isOurs = e.plugin === $.plugin.name && e.element === CLOSE_KEY + (await $.session.id())
+
+    if (isOurs) {
+      await update($, isHidden, () => true)
+      $.ui.toast(`Context meter hidden for this session. /${COMMAND} brings it back.`)
+    }
+
+    return next(e)
+  })
+
+  // /context-meter shows the band again, or hides it.
+  on('command.run', { command: COMMAND }, async $ => {
+    const hidden = await update($, isHidden, value => !value)
+
+    return { text: hidden ? 'Context meter hidden for this session.' : 'Context meter shown.' }
+  })
+
   on('session.start', async ($, e, next) => {
     const started = await next(e)
 
     // Clears the line the status-line version of this mod pinned.
     $.ui.status(undefined)
     await refresh($)
+
+    // Last, and never fatal: the band must not depend on the command.
+    try {
+      await $.command.register({
+        name: COMMAND,
+        description: 'Show or hide the context meter band in this session',
+      })
+    } catch {
+      return started
+    }
 
     return started
   })
@@ -210,13 +249,15 @@ export const register: Register = on => {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const now = await read($, reading)
 
-    if (e.props.hasSurvey || now === null) {
+    if (e.props.hasSurvey || now === null || (await read($, isHidden))) {
       return next(e)
     }
 
+    const closeKey = CLOSE_KEY + (await $.session.id())
+
     // Desktop: a thin rounded SVG bar. Other surfaces have no Svg element.
     if (e.surface === 'desktop') {
-      const { Box, Svg, Text } = $.ui.resolve(e)
+      const { Box, Button, Svg, Text } = $.ui.resolve(e)
       const bars = toBars(now.segments)
 
       return (
@@ -241,16 +282,21 @@ export const register: Register = on => {
               {k(now.used)} / {k(now.max)}
             </Text>
           </Box>
+
+          <Box flexShrink={0}>
+            <Button key={closeKey} plain dimColor label={CLOSE_GLYPH} onPress={noop} />
+          </Box>
         </Box>
       )
     }
 
     // Everywhere else (the terminal): the same line, the bar made of
     // coloured line characters sized to the columns there are.
-    const { Box, Text } = $.ui.resolve(e)
+    const { Box, Button, Text } = $.ui.resolve(e)
     const left = `${now.percent}% used`
     const right = `${k(now.used)} / ${k(now.max)}`
-    const room = e.props.bodyColumns - left.length - right.length - 2
+    // Two gaps around the bar, and a gap and one cell for the close mark.
+    const room = e.props.bodyColumns - left.length - right.length - 4
     const runs = toRuns(toBars(now.segments), Math.max(TEXT_BAR_MIN, room))
 
     return (
@@ -262,6 +308,7 @@ export const register: Register = on => {
           ))}
         </Text>
         <Text dimColor>{right}</Text>
+        <Button key={closeKey} plain dimColor label={CLOSE_GLYPH} onPress={noop} />
       </Box>
     )
   })

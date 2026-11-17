@@ -9,6 +9,6 @@ export type Reading = {
 
 declare module 'claude-code' {
   interface PluginState {
-    'context-meter': { reading: Shaped<Reading | null> }
+    'context-meter': { reading: Shaped<Reading | null>; isHidden: boolean }
   }
 }

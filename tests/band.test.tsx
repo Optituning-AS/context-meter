@@ -63,6 +63,8 @@ test('the band shows percent and tokens on every surface', async ($, on) => {
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('session.usage', () => ({ value: USAGE }))
   on('ui.status', () => ({ value: undefined }))
+  on('command.register', () => ({ value: { command: 'context-meter' } }))
+  on('session.id', () => ({ value: 'session-a' }))
 
   await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
 
@@ -79,13 +81,40 @@ test('the terminal draws the bar as a line that fits the columns', async ($, on)
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('session.usage', () => ({ value: USAGE }))
   on('ui.status', () => ({ value: undefined }))
+  on('command.register', () => ({ value: { command: 'context-meter' } }))
+  on('session.id', () => ({ value: 'session-a' }))
 
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
 
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
   const bar = await ui.find({ type: 'Text', text: /━/ })
 
-  // 80 columns, less "53% used", "211.3k / 400k" and the two gaps.
-  expect(bar?.text.length).toBe(80 - '53% used'.length - '211.3k / 400k'.length - 2)
+  // 80 columns, less "53% used", "211.3k / 400k", the close mark and three gaps.
+  expect(bar?.text.length).toBe(80 - '53% used'.length - '211.3k / 400k'.length - 4)
+  await ui.unmount()
+})
+
+test('the close button hides the band for the session it was drawn in', async ($, on) => {
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('session.usage', () => ({ value: USAGE }))
+  on('ui.status', () => ({ value: undefined }))
+  on('ui.toast', () => ({ value: undefined }))
+  on('command.register', () => ({ value: { command: 'context-meter' } }))
+  on('session.id', () => ({ value: 'session-a' }))
+  // The engine draws nothing of its own in the band.
+  on('ui.render', ($, e) => {
+    const { Text } = $.ui.resolve(e)
+
+    return <Text>empty</Text>
+  })
+
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+
+  const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
+  expect((await ui.find({ type: 'Text', text: /% used/ }))?.text).toBe('53% used')
+
+  await ui.press({ key: 'close:session-a' })
+
+  expect(await ui.find({ type: 'Text', text: /% used/ })).toBe(undefined)
   await ui.unmount()
 })
