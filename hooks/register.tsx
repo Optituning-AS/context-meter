@@ -89,6 +89,41 @@ const svgBar = (bars: Bar[]): string => {
   ].join('')
 }
 
+// The terminal's bar: one heavy line character per cell, never under 20 cells
+// (room for every category to get one).
+const TEXT_BAR_GLYPH = '\u2501'
+const TEXT_BAR_MIN = 20
+
+// A terminal has no see-through colours, so the greys are solid there.
+const TEXT_COLORS: Record<string, string> = {
+  [USED_GREY]: '#8a8a8a',
+  [BUFFER_GREY]: '#5c5c5c',
+  [FREE_GREY]: '#3a3a3a',
+}
+
+type Run = { color: string; cells: number }
+
+// Shares turned into whole cells that add up to `width`, at least 1 each.
+const toRuns = (bars: Bar[], width: number): Run[] => {
+  const runs = bars.map(bar => ({
+    color: TEXT_COLORS[bar.color] ?? bar.color,
+    cells: Math.max(1, Math.round((bar.share / 100) * width)),
+  }))
+
+  // The widest one takes the rounding error.
+  const over = runs.reduce((sum, run) => sum + run.cells, 0) - width
+  const widest = runs.reduce<Run | undefined>(
+    (best, run) => (best === undefined || run.cells > best.cells ? run : best),
+    undefined,
+  )
+
+  if (widest !== undefined) {
+    widest.cells = Math.max(1, widest.cells - over)
+  }
+
+  return runs
+}
+
 const toReading = (context: SessionContextUsage): Reading | null => {
   const breakdown = context.breakdown
 
@@ -210,14 +245,23 @@ export const register: Register = on => {
       )
     }
 
+    // Everywhere else (the terminal): the same line, the bar made of
+    // coloured line characters sized to the columns there are.
     const { Box, Text } = $.ui.resolve(e)
+    const left = `${now.percent}% used`
+    const right = `${k(now.used)} / ${k(now.max)}`
+    const room = e.props.bodyColumns - left.length - right.length - 2
+    const runs = toRuns(toBars(now.segments), Math.max(TEXT_BAR_MIN, room))
 
     return (
-      <Box flexDirection="row" justifyContent="space-between">
-        <Text>{now.percent}% used</Text>
-        <Text dimColor>
-          {k(now.used)} / {k(now.max)}
+      <Box flexDirection="row" gap={1}>
+        <Text>{left}</Text>
+        <Text>
+          {runs.map(run => (
+            <Text color={run.color}>{TEXT_BAR_GLYPH.repeat(run.cells)}</Text>
+          ))}
         </Text>
+        <Text dimColor>{right}</Text>
       </Box>
     )
   })
