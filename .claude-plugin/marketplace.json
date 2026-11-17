@@ -1,0 +1,11 @@
+{
+  "name": "context-meter",
+  "owner": { "name": "Optituning" },
+  "plugins": [
+    {
+      "name": "context-meter",
+      "source": "./",
+      "description": "A band above the prompt with context window usage: percent, a segmented bar, and used / max tokens"
+    }
+  ]
+}
