@@ -32,3 +32,7 @@ In the desktop app, where `/plugin` does not run: click + next to the prompt box
 
 - The pill bar is drawn in the Claude Code desktop app. Other surfaces show the percent and the token count as text.
 - If you set an auto-compact window for your model, the band measures against that window.
+
+## License
+
+MIT. See [LICENSE](LICENSE).

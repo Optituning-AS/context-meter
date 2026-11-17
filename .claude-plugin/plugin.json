@@ -2,5 +2,6 @@
   "name": "context-meter",
   "version": "0.3.0",
   "description": "A band above the prompt with context window usage: percent, a segmented bar, and used / max tokens.",
-  "types": "./types/index.d.ts"
+  "types": "./types/index.d.ts",
+  "license": "MIT"
 }
